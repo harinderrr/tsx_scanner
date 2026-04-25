@@ -16,7 +16,7 @@ import sys
 import os
 import requests
 import time
-from datetime import datetime
+import datetime as dt_module
 from core.config import Config
 from core.state  import state, WatchedStock, OpenPosition
 from alerts.telegram_bot import (
@@ -133,7 +133,7 @@ def handle_command(text: str):
                 shares=shares, capital=capital,
                 confirmations=["Manually added"],
                 warnings=[],
-                added_date=datetime.now().strftime("%Y-%m-%d"),
+                added_date=dt_module.datetime.now().strftime("%Y-%m-%d"),
             )
             state.add_to_watchlist(stock)
             send_message(
@@ -168,7 +168,7 @@ def handle_command(text: str):
                 ticker=ticker,
                 sector=stock.sector,
                 entry_price=entry_price,
-                entry_date=datetime.now().strftime("%Y-%m-%d %H:%M"),
+                entry_date=dt_module.datetime.now().strftime("%Y-%m-%d %H:%M"),
                 shares=stock.shares,
                 stop_price=stock.stop_price,
                 target1=stock.target1,
@@ -228,10 +228,10 @@ def handle_command(text: str):
         watched   = len(state.get_watchlist())
         positions = len(state.get_positions())
         alerts    = len(state.get_active_alerts())
-        from datetime import datetime
+        from datetime import datetime as _dt
         from pytz import timezone
         mt = timezone("America/Edmonton")
-        now = datetime.now(mt).strftime("%I:%M %p MT")
+        now = _dt.now(mt).strftime("%I:%M %p MT")
         send_message(
             f"⚙️ <b>System Status</b>\n\n"
             f"Watchlist: {watched} stocks\n"
