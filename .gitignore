@@ -1,0 +1,11 @@
+# Never commit these
+.env
+state/
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+tsx_report_*.txt
+
+# Keep the example
+!.env.example
