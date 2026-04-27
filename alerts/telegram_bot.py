@@ -348,9 +348,10 @@ def send_startup_message():
 System is running and monitoring your watchlist.
 
 Scheduled jobs:
-  • Every 5 min (market hours): price checks
+  • Every 5 min (7:00 AM – 2:30 PM MT): price checks
+  • 7:00 AM MT daily: pre-market briefing
+  • 7:35 AM MT daily: portfolio update
   • 4:15 PM MT daily: full scanner run
-  • 9:30 AM MT daily: portfolio update
   • Saturday 8 AM MT: weekly review
 
 Commands:
@@ -361,6 +362,61 @@ Commands:
 
 ⏰ {now_str()}
 """.strip()
+    return send_message(msg)
+
+
+def send_premarket_briefing(watched: dict, prices: dict):
+    """7:00 AM MT — shows which watchlist stocks are near entry zones before open."""
+    if not watched:
+        return send_message(
+            f"🌅 <b>Pre-Market Briefing</b>\n\nWatchlist is empty.\n\n⏰ {now_str()}"
+        )
+
+    near_entry = []
+    lines = []
+
+    for ticker, stock in watched.items():
+        price_data = prices.get(ticker)
+        if not price_data:
+            lines.append(f"  ❓ <b>{ticker}</b>  no data  (entry: ${stock.entry_price:.2f})")
+            continue
+
+        curr      = price_data["price"]
+        entry     = stock.entry_price
+        dist_pct  = (curr - entry) / entry * 100
+
+        if abs(dist_pct) <= 1.0:
+            zone = "🚨 AT ENTRY"
+            near_entry.append(ticker)
+        elif -3.0 <= dist_pct <= 3.0:
+            zone = "🟡 NEAR"
+            near_entry.append(ticker)
+        elif dist_pct < -3.0:
+            zone = "⬇️  below"
+        else:
+            zone = "⬆️  above"
+
+        lines.append(
+            f"  {zone}  <b>{ticker}</b>  ${curr:.2f}"
+            f"  (entry ${entry:.2f} | {dist_pct:+.1f}%)"
+        )
+
+    body = "\n".join(lines) if lines else "  No price data."
+    alert = (
+        f"\n⚡ <b>Near entry:</b> {', '.join(near_entry)}"
+        if near_entry else "\n  No stocks near entry zones."
+    )
+
+    msg = f"""
+🌅 <b>PRE-MARKET BRIEFING</b>  —  {len(watched)} stocks watched
+
+{body}
+{alert}
+
+TSX opens 7:30 AM MT — 30 min to open.
+⏰ {now_str()}
+""".strip()
+
     return send_message(msg)
 
 

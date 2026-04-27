@@ -14,13 +14,23 @@ MT = pytz.timezone("America/Edmonton")
 
 
 def is_market_open() -> bool:
-    """Check if TSX is currently open (9:30am - 4:00pm MT, weekdays)."""
+    """Check if TSX is currently open (7:30 AM - 2:00 PM MT, weekdays)."""
     now = datetime.now(MT)
     if now.weekday() >= 5:   # Saturday=5, Sunday=6
         return False
-    market_open  = now.replace(hour=9,  minute=30, second=0, microsecond=0)
-    market_close = now.replace(hour=16, minute=0,  second=0, microsecond=0)
+    market_open  = now.replace(hour=7,  minute=30, second=0, microsecond=0)
+    market_close = now.replace(hour=14, minute=0,  second=0, microsecond=0)
     return market_open <= now <= market_close
+
+
+def is_monitoring_window() -> bool:
+    """Check if we're in the price-monitoring window (7:00 AM - 2:30 PM MT, weekdays)."""
+    now = datetime.now(MT)
+    if now.weekday() >= 5:
+        return False
+    window_open  = now.replace(hour=7,  minute=0,  second=0, microsecond=0)
+    window_close = now.replace(hour=14, minute=30, second=0, microsecond=0)
+    return window_open <= now <= window_close
 
 
 def get_current_prices(tickers: list[str]) -> dict[str, dict]:

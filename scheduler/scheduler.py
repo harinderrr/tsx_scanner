@@ -3,9 +3,10 @@ scheduler.py — Runs all jobs on schedule.
 Uses APScheduler for reliable job management.
 
 Jobs:
-  • Every 5 min (market hours): price monitor
+  • Every 5 min (7:00 AM – 2:30 PM MT): price monitor
+  • 7:00 AM MT weekdays: pre-market briefing
   • 4:15 PM MT weekdays: daily scanner
-  • 9:30 AM MT weekdays: portfolio update
+  • 7:35 AM MT weekdays: portfolio update
   • Saturday 8 AM MT: weekly review
 """
 
@@ -22,9 +23,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from core.config  import Config
 from core.monitor import run_price_check
-from data.prices  import is_market_open
+from data.prices  import is_monitoring_window
 from alerts.telegram_bot import (
-    send_portfolio_update, send_daily_summary, send_startup_message
+    send_portfolio_update, send_daily_summary, send_startup_message,
+    send_premarket_briefing,
 )
 from core.state import state
 
@@ -34,9 +36,27 @@ MT = pytz.timezone("America/Edmonton")
 # ── Job Functions ─────────────────────────────────────────────────────────────
 
 def job_price_monitor():
-    """Every 5 minutes during market hours."""
-    if is_market_open():
+    """Every 5 minutes — 7:00 AM to 2:30 PM MT only."""
+    if is_monitoring_window():
         run_price_check()
+
+
+def job_premarket_check():
+    """7:00 AM MT weekdays — fetch prices and send pre-market briefing."""
+    today = datetime.now(MT).weekday()
+    if today >= 5:
+        return
+
+    print(f"\n[scheduler] Pre-market check at {datetime.now(MT).strftime('%I:%M %p MT')}")
+
+    from data.prices import get_current_prices
+
+    watched = state.get_watchlist()
+    if not watched:
+        return
+
+    prices = get_current_prices(list(watched.keys()))
+    send_premarket_briefing(watched, prices)
 
 
 def job_daily_scanner():
@@ -128,7 +148,7 @@ def job_daily_scanner():
 
 
 def job_portfolio_update():
-    """9:30 AM MT weekdays — market open check-in."""
+    """7:35 AM MT weekdays — market open check-in (TSX opens 7:30 AM MT)."""
     from datetime import datetime
     today = datetime.now(MT).weekday()
     if today >= 5:   # Skip weekends
@@ -176,6 +196,18 @@ def start():
         misfire_grace_time=60,
     )
 
+    # Pre-market briefing — 7:00 AM MT, Mon-Fri
+    scheduler.add_job(
+        job_premarket_check,
+        trigger=CronTrigger(
+            day_of_week="mon-fri",
+            hour=7, minute=0,
+            timezone=MT
+        ),
+        id="premarket_check",
+        name="Pre-Market Check",
+    )
+
     # Daily scanner — 4:15 PM MT, Mon-Fri
     scheduler.add_job(
         job_daily_scanner,
@@ -188,12 +220,12 @@ def start():
         name="Daily Scanner",
     )
 
-    # Portfolio update — 9:30 AM MT, Mon-Fri
+    # Portfolio update — 7:35 AM MT, Mon-Fri
     scheduler.add_job(
         job_portfolio_update,
         trigger=CronTrigger(
             day_of_week="mon-fri",
-            hour=9, minute=35,
+            hour=7, minute=35,
             timezone=MT
         ),
         id="portfolio_update",
@@ -214,9 +246,10 @@ def start():
 
     send_startup_message()
     print(f"\n[scheduler] All jobs scheduled. System running.")
-    print(f"[scheduler] Price checks every {Config.PRICE_CHECK_INTERVAL}s during market hours")
-    print(f"[scheduler] Daily scanner: 4:15 PM MT weekdays")
-    print(f"[scheduler] Portfolio update: 9:35 AM MT weekdays\n")
+    print(f"[scheduler] Price checks every {Config.PRICE_CHECK_INTERVAL}s  (7:00 AM – 2:30 PM MT)")
+    print(f"[scheduler] Pre-market check: 7:00 AM MT weekdays")
+    print(f"[scheduler] Portfolio update: 7:35 AM MT weekdays")
+    print(f"[scheduler] Daily scanner:    4:15 PM MT weekdays\n")
 
     try:
         scheduler.start()
